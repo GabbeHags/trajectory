@@ -1,6 +1,8 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, sync::OnceLock};
 
 use serde::Deserialize;
+
+static GLOBAL_CONFIG: OnceLock<Config<Verified>> = OnceLock::new();
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -110,13 +112,27 @@ impl Config<Unverified> {
 
 impl Config<Verified> {}
 
+/// Initialize the global config
+pub fn init_config(config: Config<Verified>) {
+    GLOBAL_CONFIG
+        .set(config)
+        .expect("Global config already initialized");
+}
+
+/// Get the global config
+pub fn get_config() -> &'static Config<Verified> {
+    GLOBAL_CONFIG
+        .get()
+        .expect("Config not initialized. Call init_config() first.")
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
-    HTTP,
-    HTTPS,
-    TCP,
-    UDP,
+    Http,
+    Https,
+    Tcp,
+    Udp,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,7 +165,7 @@ mod tests {
             "main".to_string(),
             EntryPoint {
                 port: 8080,
-                protocol: Protocol::HTTP,
+                protocol: Protocol::Http,
             },
         );
 
@@ -241,7 +257,7 @@ mod tests {
             "secondary".to_string(),
             EntryPoint {
                 port: 8443,
-                protocol: Protocol::HTTPS,
+                protocol: Protocol::Https,
             },
         );
         assert!(config.verify().is_ok());

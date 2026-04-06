@@ -1,9 +1,8 @@
 use chrono::Local;
 use log::{debug, info};
-use tokio::net::TcpListener;
 
 mod config;
-use config::Config;
+use config::{Config, init_config};
 
 fn setup_logger() {
     fern::Dispatch::new()
@@ -57,6 +56,9 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    debug!("Loaded config: {:?}", config);
+    // Initialize global config
+    init_config(config);
+    debug!("Loaded config: {:?}", config::get_config());
+
     Ok(())
 }
