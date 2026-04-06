@@ -137,3 +137,127 @@ pub struct Router {
 pub struct Service {
     servers: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn create_valid_config() -> Config<Unverified> {
+        let mut entry_points = HashMap::new();
+        entry_points.insert(
+            "main".to_string(),
+            EntryPoint {
+                port: 8080,
+                protocol: Protocol::HTTP,
+            },
+        );
+
+        let mut routers = HashMap::new();
+        routers.insert(
+            "api".to_string(),
+            Router {
+                entry_point: "main".to_string(),
+                match_rule: "/api/*".to_string(),
+                service: "backend".to_string(),
+            },
+        );
+
+        let mut services = HashMap::new();
+        services.insert(
+            "backend".to_string(),
+            Service {
+                servers: vec!["127.0.0.1:9000".to_string()],
+            },
+        );
+
+        Config {
+            entry_points,
+            routers,
+            services,
+            _state: std::marker::PhantomData,
+        }
+    }
+
+    #[test]
+    fn test_valid_config_verification() {
+        let config = create_valid_config();
+        assert!(config.verify().is_ok());
+    }
+
+    #[test]
+    fn test_empty_entry_points_validation() {
+        let mut config = create_valid_config();
+        config.entry_points.clear();
+        assert!(matches!(config.verify(), Err(ConfigError::Validation)));
+    }
+
+    #[test]
+    fn test_empty_routers_validation() {
+        let mut config = create_valid_config();
+        config.routers.clear();
+        assert!(matches!(config.verify(), Err(ConfigError::Validation)));
+    }
+
+    #[test]
+    fn test_empty_services_validation() {
+        let mut config = create_valid_config();
+        config.services.clear();
+        assert!(matches!(config.verify(), Err(ConfigError::Validation)));
+    }
+
+    #[test]
+    fn test_router_invalid_entry_point_reference() {
+        let mut config = create_valid_config();
+        config.routers.insert(
+            "invalid_router".to_string(),
+            Router {
+                entry_point: "nonexistent".to_string(),
+                match_rule: "/test/*".to_string(),
+                service: "backend".to_string(),
+            },
+        );
+        assert!(matches!(config.verify(), Err(ConfigError::Validation)));
+    }
+
+    #[test]
+    fn test_router_invalid_service_reference() {
+        let mut config = create_valid_config();
+        config.routers.insert(
+            "invalid_router".to_string(),
+            Router {
+                entry_point: "main".to_string(),
+                match_rule: "/test/*".to_string(),
+                service: "nonexistent_service".to_string(),
+            },
+        );
+        assert!(matches!(config.verify(), Err(ConfigError::Validation)));
+    }
+
+    #[test]
+    fn test_multiple_entry_points() {
+        let mut config = create_valid_config();
+        config.entry_points.insert(
+            "secondary".to_string(),
+            EntryPoint {
+                port: 8443,
+                protocol: Protocol::HTTPS,
+            },
+        );
+        assert!(config.verify().is_ok());
+    }
+
+    #[test]
+    fn test_multiple_routers() {
+        let mut config = create_valid_config();
+        config.routers.insert(
+            "web".to_string(),
+            Router {
+                entry_point: "main".to_string(),
+                match_rule: "/*".to_string(),
+                service: "backend".to_string(),
+            },
+        );
+        assert!(config.verify().is_ok());
+    }
+}
